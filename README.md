@@ -24,3 +24,40 @@ CREATE DATABASE company;
 CREATE SCHEMA dbo;
 ```
 База и схема созданы
+
+
+### Шаг 3 - создать и наполнить данными таблицу
+создание таблиц
+```SQL
+drop table if exists dbo.orders;
+create table dbo.orders(
+	id serial primary key, 
+	user_id varchar,
+	order_id varchar,
+	order_time integer,
+	order_cost real,
+	success_order_flg bool
+);
+
+drop table if exists dbo.analytics;
+create table dbo.analytics(
+	id serial primary key,
+	date date,
+	gmv360d_new real,
+	gmv360d_reactivated real,
+	users_count_new integer,
+	users_count_reactivated integer
+);
+```
+наполнение таблицы orders данными
+```SQL
+INSERT INTO dbo.orders (user_id, order_id, order_time, order_cost, success_order_flg)
+SELECT 
+    'user_' || FLOOR(RANDOM() * 1000)::TEXT AS user_id,
+    'order_' || FLOOR(RANDOM() * 10000)::TEXT AS order_id,
+   	EXTRACT(EPOCH FROM TIMESTAMP '2023-01-01' + RANDOM() * (CURRENT_TIMESTAMP - TIMESTAMP '2023-01-01'))::BIGINT AS order_time,
+    RANDOM() * (1000 - 10) + 10 AS order_cost,
+    CASE WHEN RANDOM() > 0.5 THEN TRUE ELSE FALSE END AS success_order_flg
+FROM 
+    generate_series(1, 1000);
+```
