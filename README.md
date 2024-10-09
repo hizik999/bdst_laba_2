@@ -57,7 +57,8 @@ SELECT
     'order_' || FLOOR(RANDOM() * 10000)::TEXT AS order_id,
    	EXTRACT(EPOCH FROM TIMESTAMP '2023-01-01' + RANDOM() * (CURRENT_TIMESTAMP - TIMESTAMP '2023-01-01'))::BIGINT AS order_time,
     RANDOM() * (1000 - 10) + 10 AS order_cost,
-    CASE WHEN RANDOM() > 0.5 THEN TRUE ELSE FALSE END AS success_order_flg
+    CASE WHEN RANDOM() > 0.3 THEN TRUE ELSE FALSE END AS success_order_flg
 FROM 
     generate_series(1, 1000);
 ```
+
