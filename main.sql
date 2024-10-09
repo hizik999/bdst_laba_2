@@ -52,23 +52,41 @@ reactivated_orders as (
 	where user_id in (	select user_id from dbo.orders 	group by user_id having count(user_id) >= 2)
 	order by to_timestamp(order_time)::date 
 
+),
+yat_order as (
+	select
+		eo.order_date,
+		eo.user_id,
+		eo.order_cost,
+		eo.is_first_order,
+		ro.is_reactivated
+	from extended_orders eo 
+	left join reactivated_orders ro 
+		on eo.order_date = ro.date and ro.user_id = eo.user_id
+	--where eo.is_first_order = 1 and ro.is_reactivated = 0
+	order by order_date
 )
 
-select
-	eo.order_date,
-	eo.user_id,
-	eo.order_cost,
-	eo.is_first_order,
-	ro.is_reactivated
-from extended_orders eo 
-left join reactivated_orders ro 
-	on eo.order_date = ro.date and ro.user_id = eo.user_id
-order by order_date
+--select * from yat_order
+
+select 
+	order_date,
+	sum(is_first_order) as first_order,
+	case
+		when sum(is_reactivated) is null then 0
+		else sum(is_reactivated) 
+	end as reactivated
+
+from yat_order
+group by order_date
+
+
+
 --SELECT user_id, date FROM reactivated_orders where is_reactivated = 1
 
--- null в is_reactivated значит, что клиент совершил только одну покупку, 0 значит эта не считается реактивированной, но не последняя, и 1 значит реактивированная
+-- null в is_reactivated значит заказ единственный, 0 значит заказ не реактивированный, и 1 значит реактивированный
 
-select * from dbo.orders o where user_id = 'user_159'
+--select to_timestamp(order_time)::date from dbo.orders o where user_id = 'user_105'
 
 
 /*
