@@ -31,26 +31,29 @@ FROM
     generate_series(1, 1000);
 
 
-drop table if exists analytics;
+drop table if exists dbo.analytics;
 
 WITH first_orders AS (
-    SELECT user_id, MIN(to_timestamp(order_time)) AS first_order_time
+    SELECT 
+    	user_id, 
+    	MIN(to_timestamp(order_time)) AS first_order_time
     FROM dbo.orders
     GROUP BY user_id
+),
+middleware_analytics as (
+	SELECT 
+	    to_timestamp(o.order_time)::date AS date,
+	    0 AS gmv360d_new,
+	    0 AS gmv360d_reactivated,
+	    COUNT(fo.user_id) AS users_count_new,
+	    0 AS users_count_reactivated
+	FROM dbo.orders o
+	LEFT JOIN first_orders fo 
+	    ON fo.first_order_time = to_timestamp(o.order_time)
+	GROUP BY to_timestamp(o.order_time)
+	ORDER BY to_timestamp(o.order_time) ASC
 )
 
-SELECT 
-    to_timestamp(o.order_time)::date AS date,
-    COUNT(fo.user_id) AS gmv360d_new,
-    0 AS gmv360d_reactivated,
-    0 AS users_count_new,
-    0 AS users_count_reactivated
-INTO dbo.analytics 
-FROM dbo.orders o
-LEFT JOIN first_orders fo 
-    ON fo.first_order_time = to_timestamp(o.order_time)
-GROUP BY to_timestamp(o.order_time)
-ORDER BY to_timestamp(o.order_time) ASC;
 
 
 SELECT 
@@ -59,11 +62,12 @@ SELECT
     SUM(gmv360d_reactivated) AS gmv360d_reactivated,
     SUM(users_count_new) AS users_count_new,
     SUM(users_count_reactivated) AS users_count_reactivated
-FROM dbo.analytics a
+into dbo.analytics
+FROM middleware_analytics a
 GROUP BY date
 order by date;
 
-
+select * from dbo.analytics a ;
 
 
 -- select user_id, count(user_id) from dbo.orders group by user_id having user_id = 'user_740' order by count(user_id) desc
