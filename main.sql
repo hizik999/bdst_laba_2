@@ -23,6 +23,69 @@ FROM
 
 drop table if exists dbo.analytics;
 
+
+WITH extended_orders AS (
+	SELECT 
+		to_timestamp(order_time)::date AS order_date,
+		user_id AS user_id,
+		order_id AS order_id,
+		order_cost,
+		success_order_flg,
+		case 
+			when row_number() over (partition by user_id order by order_time) > 1 then 0
+			else row_number() over (partition by user_id order by order_time)
+		end as is_first_order
+		
+	FROM 
+		dbo.orders
+),
+reactivated_orders as (
+	select 
+		user_id,
+		to_timestamp(order_time)::date as date,
+		case 
+			when to_timestamp(order_time)::date - LAG(to_timestamp(order_time)::date) over (partition by user_id order by user_id, to_timestamp(order_time)::date) 	> 90 then 1
+			else 0
+		end as is_reactivated
+
+	from dbo.orders 
+	where user_id in (	select user_id from dbo.orders 	group by user_id having count(user_id) >= 2)
+	order by to_timestamp(order_time)::date 
+
+)
+
+select
+	eo.order_date,
+	eo.user_id,
+	eo.order_cost,
+	eo.is_first_order,
+	ro.is_reactivated
+from extended_orders eo 
+left join reactivated_orders ro 
+	on eo.order_date = ro.date and ro.user_id = eo.user_id
+order by order_date
+--SELECT user_id, date FROM reactivated_orders where is_reactivated = 1
+
+-- null в is_reactivated значит, что клиент совершил только одну покупку, 0 значит эта не считается реактивированной, но не последняя, и 1 значит реактивированная
+
+select * from dbo.orders o where user_id = 'user_159'
+
+
+/*
+SELECT 
+	order_date,
+	count(user_id)
+FROM extended_orders 
+where is_first_order = 1
+group by order_date
+order by order_date
+*/
+
+
+
+
+
+/*
 WITH first_orders AS (
     SELECT 
     	user_id, 
@@ -45,7 +108,7 @@ reactivated_orders as (
 	order by user_id
 
 ),
---select * from reactivated_orders
+
 
 middleware_analytics as (
 	SELECT 
@@ -65,10 +128,6 @@ middleware_analytics as (
 	ORDER BY to_timestamp(o.order_time) ASC
 )
 
---select * from middleware_analytics;
-
---select * from first_orders where first_order_time = '2023-01-03' order by user_id, first_order_time
---select * from middleware_analytics --where date = '2024-01-11'
 
 SELECT 
     a.date,
@@ -88,25 +147,4 @@ group by a.date
 order by date;
 
 select * from dbo.analytics a ;
-
-
--- select user_id, count(user_id) from dbo.orders group by user_id having user_id = 'user_740' order by count(user_id) desc
--- select user_id, order_cost, to_timestamp(order_time)::date from dbo.orders o where to_timestamp(order_time)::date = '2024-10-09' order by user_id desc
--- select user_id, order_cost, to_timestamp(order_time)::date from dbo.orders o where user_id = 'user_802' order by user_id desc
-
-/*
-select 
-		user_id,
-		--order_cost,
-		count(user_id)
-		--to_timestamp(order_time)::date AS first_order_time,
-		--ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY order_time) AS rn_reactivated
-from dbo.orders 
-group by user_id
 */
-	
-
---select max(c) from (select 0 as a, 5 as b, null as c)
-
-
---select date('2024-10-01') - date('2024-01-01')
