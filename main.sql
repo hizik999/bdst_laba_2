@@ -67,18 +67,31 @@ yat_order as (
 	order by order_date
 )
 
---select * from yat_order
 
+select 
+	*
+from yat_order
+--	where o.order_date between 
+
+--select * from yat_order
+/*
 select 
 	order_date,
 	sum(is_first_order) as first_order,
 	case
 		when sum(is_reactivated) is null then 0
 		else sum(is_reactivated) 
-	end as reactivated
+	end as reactivated,
+	0 as sum_new,
+	0 as sum_reactivated
 
 from yat_order
 group by order_date
+*/
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------
+
 
 
 
