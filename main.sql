@@ -10,15 +10,25 @@ create table dbo.orders(
 );
 
 
+WITH order_data AS (
+    SELECT 
+        'user_' || FLOOR(RANDOM() * 1000)::TEXT AS user_id,
+        ROW_NUMBER() OVER () AS unique_order_id,  -- Генерация уникального идентификатора для каждой строки
+        EXTRACT(EPOCH FROM TIMESTAMP '2023-01-01' + RANDOM() * (CURRENT_TIMESTAMP - TIMESTAMP '2023-01-01'))::BIGINT AS order_time,
+        ROUND(RANDOM() * (1000 - 10)) + 10 AS order_cost,
+        CASE WHEN RANDOM() > 0.3 THEN TRUE ELSE FALSE END AS success_order_flg
+    FROM 
+        generate_series(1, 1000)
+)
 INSERT INTO dbo.orders (user_id, order_id, order_time, order_cost, success_order_flg)
 SELECT 
-    'user_' || FLOOR(RANDOM() * 1000)::TEXT AS user_id,
-    'order_' || FLOOR(RANDOM() * 10000)::TEXT AS order_id,
-   	EXTRACT(EPOCH FROM TIMESTAMP '2023-01-01' + RANDOM() * (CURRENT_TIMESTAMP - TIMESTAMP '2023-01-01'))::BIGINT AS order_time,
-    ROUND(RANDOM() * (1000 - 10)) + 10 AS order_cost,
-    CASE WHEN RANDOM() > 0.3 THEN TRUE ELSE FALSE END AS success_order_flg
-FROM 
-    generate_series(1, 1000);
+    user_id,
+    'order_' || unique_order_id::TEXT AS order_id,  -- Преобразование уникального номера в строку
+    order_time,
+    order_cost,
+    success_order_flg
+FROM order_data;
+
 */
 
 drop table if exists dbo.analytics;
@@ -42,14 +52,14 @@ WITH extended_orders AS (
 reactivated_orders as (
 	select 
 		user_id,
-		to_timestamp(order_time)::date as date,
+		to_timestamp(order_time)::date as order_date,
 		case 
 			when to_timestamp(order_time)::date - LAG(to_timestamp(order_time)::date) over (partition by user_id order by user_id, to_timestamp(order_time)::date) 	> 90 then 1
 			else 0
 		end as is_reactivated
 
 	from dbo.orders 
-	where user_id in (	select user_id from dbo.orders 	group by user_id having count(user_id) >= 2)
+	--where user_id in (	select user_id from dbo.orders 	group by user_id having count(user_id) >= 2)
 	order by to_timestamp(order_time)::date 
 
 ),
@@ -62,18 +72,32 @@ yat_order as (
 		ro.is_reactivated
 	from extended_orders eo 
 	left join reactivated_orders ro 
-		on eo.order_date = ro.date and ro.user_id = eo.user_id
+		on eo.order_date = ro.order_date and ro.user_id = eo.user_id
 	--where eo.is_first_order = 1 and ro.is_reactivated = 0
 	order by order_date
 )
 
+--select * from yat_order
+
 
 select 
 	*
-from yat_order
+from extended_orders eo1
+right join extended_orders eo2
+on eo1.user_id = eo2.user_id
+left join reactivated_orders ro1
+on eo2.user_id = ro1.user_id and eo2.order_date = ro1.order_date
+where eo2.user_id = 'user_566'
+--where eo1.is_first_order = 1 and eo2.is_first_order = 0 and eo2.order_date between eo1.order_date and eo1.order_date + interval '360 days' --and ro1.is_reactivated = 0 -- and eo2.user_id = 'user_566'
+order by eo1.order_date
 --	where o.order_date between 
 
+--select user_id, count(user_id) from dbo.orders o group by user_id having count(user_id) > 3
+--select * from dbo.orders o2 where user_id = 'user_779'
 --select * from yat_order
+
+select user_id, count(user_id) from dbo.orders o group by user_id order by count(user_id) desc
+
 /*
 select 
 	order_date,
